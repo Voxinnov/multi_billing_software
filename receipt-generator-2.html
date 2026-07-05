@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Receipt Batch Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2521;
+    --paper:#f7f5f0;
+    --line:#d8d3c6;
+    --line-dark:#a8a193;
+    --accent:#2f5d4f;
+    --accent-soft:#e7eee9;
+    --error:#9c3b2e;
+    --mono: "IBM Plex Mono", "SF Mono", Menlo, monospace;
+    --serif: "Source Serif 4", "Georgia", serif;
+    --sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:40px 24px 80px;
+  }
+  header.top{
+    margin-bottom:36px;
+    border-bottom:1px solid var(--line-dark);
+    padding-bottom:20px;
+  }
+  header.top .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:6px;
+  }
+  header.top h1{
+    font-family:var(--serif);
+    font-size:30px;
+    font-weight:600;
+    margin:0 0 8px;
+    letter-spacing:-0.01em;
+  }
+  header.top p{
+    margin:0;
+    color:#5a5f57;
+    max-width:520px;
+  }
+  section.card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:24px 26px;
+    margin-bottom:20px;
+  }
+  section.card h2{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin:0 0 18px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  section.card h2::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--line);
+  }
+  .field-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .field-row.single{grid-template-columns:1fr;}
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .field label{
+    font-size:12.5px;
+    color:#5a5f57;
+    font-weight:600;
+  }
+  .field input[type="text"],
+  .field input[type="email"],
+  .field input[type="tel"],
+  .field input[type="number"],
+  .field textarea{
+    border:1px solid var(--line-dark);
+    border-radius:2px;
+    padding:9px 10px;
+    font-family:var(--sans);
+    font-size:14.5px;
+    background:#fcfbf9;
+    color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:54px;}
+  .field input:focus, .field textarea:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+    background:#fff;
+  }
+  .template-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:14px;
+    padding-bottom:14px;
+    border-bottom:1px dashed var(--line);
+  }
+  .template-row span{
+    font-size:13px;
+    color:#5a5f57;
+  }
+  .upload-zone{
+    border:1.5px dashed var(--line-dark);
+    border-radius:3px;
+    padding:18px;
+    text-align:center;
+    cursor:pointer;
+    background:#fcfbf9;
+    transition:border-color .15s, background .15s;
+  }
+  .upload-zone:hover, .upload-zone.drag{
+    border-color:var(--accent);
+    background:var(--accent-soft);
+  }
+  .upload-zone input{display:none;}
+  .upload-zone .hint{font-size:12.5px;color:#7a7e72;margin-top:4px;}
+  .upload-zone img{max-height:70px;display:block;margin:0 auto 8px;}
+  .upload-zone .filename{font-family:var(--mono);font-size:12.5px;color:var(--accent);word-break:break-all;}
+  .img-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .checkbox-row input[type="checkbox"]{
+    width:17px;height:17px;accent-color:var(--accent);cursor:pointer;
+  }
+  .checkbox-row label{font-size:14px;font-weight:600;cursor:pointer;}
+  .tax-detail{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:-4px;
+    margin-bottom:10px;
+    padding-left:27px;
+  }
+  .tax-detail input[type="number"]{width:80px;}
+  .tax-detail span{font-size:13.5px;color:#5a5f57;}
+  .file-status{
+    margin-top:10px;
+    font-size:13px;
+    font-family:var(--mono);
+  }
+  .file-status.ok{color:var(--accent);}
+  .file-status.err{color:var(--error);}
+  table.preview{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:14px;
+    font-size:13px;
+  }
+  table.preview th, table.preview td{
+    text-align:left;
+    padding:7px 9px;
+    border-bottom:1px solid var(--line);
+  }
+  table.preview th{
+    font-family:var(--mono);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    color:#7a7e72;
+  }
+  .generate-bar{
+    position:sticky;
+    bottom:0;
+    background:linear-gradient(to top, var(--paper) 70%, transparent);
+    padding:20px 0 6px;
+    margin-top:8px;
+  }
+  button.primary{
+    width:100%;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:3px;
+    padding:15px 18px;
+    font-size:15.5px;
+    font-weight:600;
+    font-family:var(--sans);
+    cursor:pointer;
+    transition:background .15s;
+  }
+  button.primary:hover{background:#244a3f;}
+  button.primary:disabled{background:#a8b3ab;cursor:not-allowed;}
+  button.secondary{
+    background:transparent;
+    border:1px solid var(--line-dark);
+    color:var(--ink);
+    border-radius:2px;
+    padding:8px 14px;
+    font-size:13px;
+    cursor:pointer;
+    font-family:var(--sans);
+  }
+  button.secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .status-msg{
+    text-align:center;
+    font-size:13px;
+    margin-top:10px;
+    color:#5a5f57;
+    min-height:18px;
+  }
+  .status-msg.err{color:var(--error);font-weight:600;}
+  .status-msg.ok{color:var(--accent);font-weight:600;}
+  .note{
+    font-size:12.5px;
+    color:#7a7e72;
+    margin-top:4px;
+  }
+  .col-narrow{max-width:140px;}
+  @media (max-width:560px){
+    .field-row, .img-fields{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">Batch Receipt Generator</div>
+    <h1>Excel → Receipts, ready to print</h1>
+    <p>Upload a transaction list, fill in your company details once, and get back a single PDF with one full receipt per transaction — numbered in sequence.</p>
+  </header>
+
+  <!-- STEP 1: FILE UPLOAD -->
+  <section class="card">
+    <h2>1 / Transaction file</h2>
+    <div class="template-row">
+      <span>Not sure of the format?</span>
+      <button class="secondary" id="downloadTemplateBtn" type="button">Download Excel template</button>
+    </div>
+    <div class="upload-zone" id="dropZone">
+      <div class="filename" id="fileLabel">Click to choose a file, or drag it here</div>
+      <div class="hint">.xlsx or .csv — columns: date, name, amount, purpose</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+    </div>
+    <div class="file-status" id="fileStatus"></div>
+    <div id="previewWrap"></div>
+  </section>
+
+  <!-- STEP 2: COMPANY DETAILS -->
+  <section class="card">
+    <h2>2 / Company details</h2>
+    <div class="field-row">
+      <div class="field">
+        <label for="companyName">Company name</label>
+        <input type="text" id="companyName" placeholder="e.g. Riverstone Traders" />
+      </div>
+      <div class="field">
+        <label for="companyGstin">GSTIN</label>
+        <input type="text" id="companyGstin" placeholder="e.g. 32AAHCE7860N1Z7" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="companyPhone">Phone number</label>
+        <input type="tel" id="companyPhone" placeholder="e.g. +91 98765 43210" />
+      </div>
+      <div class="field">
+        <label for="companyEmail">Email</label>
+        <input type="email" id="companyEmail" placeholder="e.g. accounts@company.com" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="startInvoice">Starting invoice number</label>
+        <input type="text" id="startInvoice" placeholder="e.g. 101" value="101" />
+      </div>
+      <div class="field">
+        <label for="placeOfSupply">Place of supply</label>
+        <input type="text" id="placeOfSupply" placeholder="e.g. 32-KERALA" />
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label for="companyAddress">Address</label>
+        <textarea id="companyAddress" placeholder="Street, city, state, PIN"></textarea>
+      </div>
+    </div>
+    <div class="note">Invoices will be numbered INV-&lt;start&gt;, INV-&lt;start+1&gt;, ... in the order rows appear in your file.</div>
+  </section>
+
+  <!-- STEP 2B: BANK DETAILS -->
+  <section class="card">
+    <h2>2B / Bank details <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></h2>
+    <div class="field-row">
+      <div class="field">
+        <label for="bankName">Bank name</label>
+        <input type="text" id="bankName" placeholder="e.g. Union Bank of India" />
+      </div>
+      <div class="field">
+        <label for="bankBranch">Branch</label>
+        <input type="text" id="bankBranch" placeholder="e.g. Kothamangalam" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="bankAccount">Account number</label>
+        <input type="text" id="bankAccount" placeholder="e.g. 423001010038151" />
+      </div>
+      <div class="field">
+        <label for="bankIfsc">IFSC code</label>
+        <input type="text" id="bankIfsc" placeholder="e.g. UBIN0533769" />
+      </div>
+    </div>
+    <div class="note">Leave blank to omit the bank details box from the receipt.</div>
+  </section>
+
+  <!-- STEP 3: TAX -->
+  <section class="card">
+    <h2>3 / Tax</h2>
+    <div class="checkbox-row">
+      <input type="checkbox" id="taxEnabled" />
+      <label for="taxEnabled">Add GST to each receipt</label>
+    </div>
+    <div class="tax-detail" id="taxDetail" style="display:none;">
+      <span>GST rate:</span>
+      <input type="number" id="taxRate" value="18" min="0" step="0.1" />
+      <span>% &nbsp;(split as CGST + SGST, half each)</span>
+    </div>
+    <div class="note">When enabled, the amount in your Excel file is treated as <strong>tax-inclusive</strong> — the receipt backs out the taxable value, then splits the tax equally into CGST and SGST. The total stays the same as your transaction amount. When disabled, the amount is shown as-is with no tax line.</div>
+  </section>
+
+  <!-- STEP 4: SEAL & SIGNATURE -->
+  <section class="card">
+    <h2>4 / Logo, seal &amp; signature</h2>
+    <div class="img-fields">
+      <div>
+        <div class="upload-zone" id="logoZone">
+          <div class="filename" id="logoLabel">Upload company logo</div>
+          <div class="hint">PNG/JPG, optional — shown top-right</div>
+          <input type="file" id="logoInput" accept="image/*" />
+        </div>
+      </div>
+      <div>
+        <div class="upload-zone" id="sealZone">
+          <div class="filename" id="sealLabel">Upload company seal</div>
+          <div class="hint">PNG/JPG, optional</div>
+          <input type="file" id="sealInput" accept="image/*" />
+        </div>
+      </div>
+    </div>
+    <div class="img-fields" style="margin-top:14px;">
+      <div>
+        <div class="upload-zone" id="sigZone">
+          <div class="filename" id="sigLabel">Upload signature image</div>
+          <div class="hint">PNG/JPG, optional</div>
+          <input type="file" id="sigInput" accept="image/*" />
+        </div>
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <label for="signerName">Signed by (name printed under signature)</label>
+        <input type="text" id="signerName" placeholder="e.g. A. Kumar" />
+      </div>
+    </div>
+  </section>
+
+  <div class="generate-bar">
+    <button class="primary" id="generateBtn" disabled>Upload a transaction file to continue</button>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+let rows = [];        // parsed transaction rows
+let sealDataUrl = null;
+let sigDataUrl = null;
+let logoDataUrl = null;
+
+const fileInput   = document.getElementById('fileInput');
+const dropZone    = document.getElementById('dropZone');
+const fileLabel   = document.getElementById('fileLabel');
+const fileStatus  = document.getElementById('fileStatus');
+const previewWrap = document.getElementById('previewWrap');
+const generateBtn = document.getElementById('generateBtn');
+const statusMsg   = document.getElementById('statusMsg');
+
+const taxEnabled  = document.getElementById('taxEnabled');
+const taxDetail   = document.getElementById('taxDetail');
+
+taxEnabled.addEventListener('change', () => {
+  taxDetail.style.display = taxEnabled.checked ? 'flex' : 'none';
+});
+
+document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
+  const sampleData = [
+    { Date: '01-06-2026', Name: 'Ramesh Kumar', Amount: 5000, Purpose: 'Consulting fee for May' },
+    { Date: '05-06-2026', Name: 'Priya Sharma', Amount: 12500.50, Purpose: 'Web design project' },
+    { Date: '10-06-2026', Name: 'Anil Traders', Amount: 800, Purpose: 'Office supplies' }
+  ];
+  const ws = XLSX.utils.json_to_sheet(sampleData);
+  ws['!cols'] = [{ wch: 14 }, { wch: 22 }, { wch: 12 }, { wch: 32 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+  XLSX.writeFile(wb, 'transaction_template.xlsx');
+});
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  if (e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    handleFile(e.dataTransfer.files[0]);
+  }
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function setupImageZone(zoneId, inputId, labelId, onLoad) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const label = document.getElementById(labelId);
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      onLoad(ev.target.result);
+      label.textContent = f.name;
+      const img = document.createElement('img');
+      img.src = ev.target.result;
+      zone.insertBefore(img, zone.firstChild);
+    };
+    reader.readAsDataURL(f);
+  });
+}
+setupImageZone('sealZone','sealInput','sealLabel', url => sealDataUrl = url);
+setupImageZone('sigZone','sigInput','sigLabel', url => sigDataUrl = url);
+setupImageZone('logoZone','logoInput','logoLabel', url => logoDataUrl = url);
+
+function normalizeKey(k) {
+  return String(k).trim().toLowerCase();
+}
+
+function findCol(headerMap, candidates) {
+  for (const c of candidates) {
+    if (headerMap[c] !== undefined) return headerMap[c];
+  }
+  return null;
+}
+
+function parseDateValue(v) {
+  if (v instanceof Date) return v;
+  if (typeof v === 'number') {
+    // Excel serial date
+    const d = XLSX.SSF.parse_date_code(v);
+    if (d) return new Date(d.y, d.m - 1, d.d);
+  }
+  if (typeof v === 'string') {
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function handleFile(file) {
+  fileStatus.textContent = '';
+  fileStatus.className = 'file-status';
+  previewWrap.innerHTML = '';
+  rows = [];
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Upload a transaction file to continue';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      if (!json.length) {
+        throw new Error('The file has no data rows.');
+      }
+
+      const headerMap = {};
+      Object.keys(json[0]).forEach(k => headerMap[normalizeKey(k)] = k);
+
+      const dateKey   = findCol(headerMap, ['date', 'transaction date', 'txn date']);
+      const nameKey   = findCol(headerMap, ['name', 'customer', 'customer name', 'client', 'client name']);
+      const amountKey = findCol(headerMap, ['amount', 'amt', 'total', 'value']);
+      const purposeKey= findCol(headerMap, ['purpose', 'item', 'description', 'item/description', 'particulars']);
+
+      const missing = [];
+      if (!dateKey) missing.push('date');
+      if (!nameKey) missing.push('name');
+      if (!amountKey) missing.push('amount');
+      if (!purposeKey) missing.push('purpose/description');
+
+      if (missing.length) {
+        throw new Error(`Could not find column(s): ${missing.join(', ')}. Found headers: ${Object.keys(json[0]).join(', ')}`);
+      }
+
+      rows = json.map((r, i) => {
+        const rawDate = r[dateKey];
+        const parsedDate = parseDateValue(rawDate);
+        const amountNum = parseFloat(String(r[amountKey]).replace(/[^0-9.\-]/g, ''));
+        return {
+          rowNum: i + 1,
+          dateRaw: rawDate,
+          date: parsedDate,
+          dateDisplay: parsedDate ? parsedDate.toLocaleDateString('en-GB') : String(rawDate),
+          name: String(r[nameKey] ?? '').trim(),
+          amount: isNaN(amountNum) ? 0 : amountNum,
+          purpose: String(r[purposeKey] ?? '').trim()
+        };
+      }).filter(r => r.name || r.amount || r.purpose);
+
+      if (!rows.length) throw new Error('No valid transaction rows found after parsing.');
+
+      fileLabel.textContent = file.name;
+      fileStatus.textContent = `Loaded ${rows.length} transaction${rows.length !== 1 ? 's' : ''}.`;
+      fileStatus.className = 'file-status ok';
+
+      renderPreview();
+      generateBtn.disabled = false;
+      generateBtn.textContent = `Generate PDF (${rows.length} receipt${rows.length !== 1 ? 's' : ''})`;
+
+    } catch (err) {
+      fileStatus.textContent = 'Error: ' + err.message;
+      fileStatus.className = 'file-status err';
+      generateBtn.disabled = true;
+      generateBtn.textContent = 'Upload a transaction file to continue';
+    }
+  };
+  reader.onerror = () => {
+    fileStatus.textContent = 'Could not read that file. Try again.';
+    fileStatus.className = 'file-status err';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderPreview() {
+  const maxShow = 6;
+  let html = '<table class="preview"><thead><tr><th>Date</th><th>Name</th><th>Purpose</th><th class="col-narrow">Amount</th></tr></thead><tbody>';
+  rows.slice(0, maxShow).forEach(r => {
+    html += `<tr><td>${escapeHtml(r.dateDisplay)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.purpose)}</td><td class="col-narrow">${r.amount.toFixed(2)}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  if (rows.length > maxShow) {
+    html += `<div class="note">+ ${rows.length - maxShow} more row(s)</div>`;
+  }
+  previewWrap.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function parseStartInvoice(val) {
+  val = String(val).trim();
+  const match = val.match(/^([A-Za-z\-]*)(\d+)$/);
+  if (match) {
+    return { prefix: match[1] || 'INV-', num: parseInt(match[2], 10), padLen: match[2].length };
+  }
+  const n = parseInt(val, 10);
+  return { prefix: 'INV-', num: isNaN(n) ? 1 : n, padLen: String(isNaN(n) ? 1 : n).length };
+}
+
+function formatInvoiceNumber(base, offset) {
+  const num = base.num + offset;
+  let numStr = String(num);
+  if (base.padLen > numStr.length) numStr = numStr.padStart(base.padLen, '0');
+  return base.prefix + numStr;
+}
+
+function fmtMoney(n) {
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function numberToWordsIndian(num) {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function twoDigits(n) {
+    if (n < 20) return ones[n];
+    return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+  }
+  function threeDigits(n) {
+    if (n < 100) return twoDigits(n);
+    return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + twoDigits(n % 100) : '');
+  }
+
+  if (num === 0) return 'Zero';
+
+  let rupees = Math.floor(num);
+  const paise = Math.round((num - rupees) * 100);
+
+  const crore = Math.floor(rupees / 10000000); rupees %= 10000000;
+  const lakh = Math.floor(rupees / 100000); rupees %= 100000;
+  const thousand = Math.floor(rupees / 1000); rupees %= 1000;
+  const hundred = rupees;
+
+  let parts = [];
+  if (crore) parts.push(threeDigits(crore) + ' Crore');
+  if (lakh) parts.push(threeDigits(lakh) + ' Lakh');
+  if (thousand) parts.push(threeDigits(thousand) + ' Thousand');
+  if (hundred) parts.push(threeDigits(hundred));
+
+  let result = parts.join(', ') + (rupees === 1 && crore === 0 && lakh === 0 && thousand === 0 ? ' Rupee' : ' Rupees');
+  if (paise > 0) {
+    result += ' and ' + twoDigits(paise) + ' Paise';
+  }
+  return result + ' Only';
+}
+
+function getImageFormat(dataUrl) {
+  if (!dataUrl) return 'PNG';
+  if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+  return 'PNG';
+}
+
+generateBtn.addEventListener('click', () => {
+  if (!rows.length) return;
+  statusMsg.textContent = '';
+  statusMsg.className = 'status-msg';
+  generateBtn.disabled = true;
+  const originalLabel = generateBtn.textContent;
+  generateBtn.textContent = 'Generating…';
+
+  try {
+    const companyName = document.getElementById('companyName').value.trim() || 'Your Company Name';
+    const companyGstin = document.getElementById('companyGstin').value.trim();
+    const companyPhone = document.getElementById('companyPhone').value.trim();
+    const companyEmail = document.getElementById('companyEmail').value.trim();
+    const companyAddress = document.getElementById('companyAddress').value.trim();
+    const placeOfSupply = document.getElementById('placeOfSupply').value.trim();
+    const signerName = document.getElementById('signerName').value.trim();
+    const bankName = document.getElementById('bankName').value.trim();
+    const bankBranch = document.getElementById('bankBranch').value.trim();
+    const bankAccount = document.getElementById('bankAccount').value.trim();
+    const bankIfsc = document.getElementById('bankIfsc').value.trim();
+    const hasBankDetails = bankName || bankAccount || bankIfsc || bankBranch;
+
+    const taxOn = taxEnabled.checked;
+    const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+    const halfRate = taxRate / 2;
+    const startInvoiceRaw = document.getElementById('startInvoice').value.trim() || '101';
+    const invBase = parseStartInvoice(startInvoiceRaw);
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const marginX = 46;
+    const contentW = pageW - marginX * 2;
+    const todayStr = new Date().toLocaleDateString('en-GB');
+
+    rows.forEach((row, idx) => {
+      if (idx > 0) doc.addPage();
+
+      const invoiceNo = formatInvoiceNumber(invBase, idx);
+      let y = 50;
+
+      // ---- Top strip: TAX INVOICE / ORIGINAL FOR RECIPIENT ----
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(40, 84, 158);
+      doc.text('TAX INVOICE', marginX, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(120, 124, 116);
+      doc.text('ORIGINAL FOR RECIPIENT', pageW - marginX, y, { align: 'right' });
+      y += 18;
+
+      doc.setDrawColor(216, 211, 198);
+      doc.setLineWidth(0.75);
+      doc.line(marginX, y, pageW - marginX, y);
+      y += 22;
+
+      // ---- Company header (left) + logo (right) ----
+      const headerTopY = y;
+      const logoReserve = logoDataUrl ? 78 : 0;
+      const nameMaxW = contentW - logoReserve;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(15);
+      doc.setTextColor(28, 37, 33);
+      const nameLines = doc.splitTextToSize(companyName, nameMaxW);
+      doc.text(nameLines, marginX, y);
+      y += nameLines.length * 16;
+
+      if (companyGstin) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(90, 95, 87);
+        doc.text('GSTIN ' + companyGstin, marginX, y);
+        y += 13;
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(90, 95, 87);
+      if (companyAddress) {
+        const addrLines = doc.splitTextToSize(companyAddress, nameMaxW);
+        doc.text(addrLines, marginX, y);
+        y += addrLines.length * 11.5;
+      }
+      let contactLine = [];
+      if (companyPhone) contactLine.push('Mobile ' + companyPhone);
+      if (companyEmail) contactLine.push('Email ' + companyEmail);
+      if (contactLine.length) {
+        doc.text(contactLine.join('   '), marginX, y);
+        y += 13;
+      }
+
+      // Logo (top-right, within header band)
+      if (logoDataUrl) {
+        try {
+          doc.addImage(logoDataUrl, getImageFormat(logoDataUrl), pageW - marginX - 64, headerTopY - 8, 64, 64, undefined, 'FAST');
+        } catch (e) { /* ignore bad image */ }
+      }
+
+      y += 14;
+
+      // ---- Invoice # / Date / Due date row ----
+      doc.setDrawColor(216, 211, 198);
+      doc.setLineWidth(0.6);
+      doc.line(marginX, y, pageW - marginX, y);
+      y += 18;
+
+      const col2X = marginX + contentW * 0.36;
+      const col3X = marginX + contentW * 0.68;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(90, 95, 87);
+      doc.text('Invoice #:', marginX, y);
+      doc.text('Invoice Date:', col2X, y);
+      doc.text('Due Date:', col3X, y);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(28, 37, 33);
+      doc.text(invoiceNo, marginX + 52, y);
+      doc.text(row.dateDisplay, col2X + 68, y);
+      doc.text(row.dateDisplay, col3X + 56, y);
+      y += 22;
+
+      doc.setDrawColor(216, 211, 198);
+      doc.setLineWidth(0.6);
+      doc.line(marginX, y, pageW - marginX, y);
+      y += 20;
+
+      // ---- Customer details / Place of supply ----
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(90, 95, 87);
+      doc.text('Customer Details:', marginX, y);
+      y += 14;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11.5);
+      doc.setTextColor(28, 37, 33);
+      doc.text(row.name || '—', marginX, y);
+
+      if (placeOfSupply) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.setTextColor(90, 95, 87);
+        doc.text('Place of Supply:', col3X, y - 14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(28, 37, 33);
+        doc.text(placeOfSupply, col3X, y);
+      }
+      y += 26;
+
+      // ---- Line item table ----
+      const taxColsOn = taxOn;
+      // Column layout (proportions of contentW)
+      const c_no = marginX;
+      const c_item = marginX + contentW * 0.04;
+      const c_rate = marginX + contentW * (taxColsOn ? 0.38 : 0.46);
+      const c_qty = marginX + contentW * (taxColsOn ? 0.50 : 0.60);
+      const c_taxable = marginX + contentW * (taxColsOn ? 0.58 : 0);
+      const c_taxamt = marginX + contentW * (taxColsOn ? 0.76 : 0);
+      const c_amount = pageW - marginX;
+
+      doc.setFillColor(231, 238, 233);
+      doc.rect(marginX, y, contentW, 22, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(47, 93, 79);
+      doc.text('#', c_no + 4, y + 14);
+      doc.text('ITEM', c_item, y + 14);
+      doc.text('RATE / ITEM', c_rate, y + 14);
+      doc.text('QTY', c_qty, y + 14);
+      if (taxColsOn) {
+        doc.text('TAXABLE VALUE', c_taxable, y + 14);
+        doc.text('TAX AMOUNT', c_taxamt, y + 14);
+      }
+      doc.text('AMOUNT', c_amount, y + 14, { align: 'right' });
+      y += 22;
+
+      // Compute amounts (tax-inclusive logic preserved)
+      const total = row.amount;
+      let taxableValue = total;
+      let taxAmt = 0;
+      let cgstAmt = 0, sgstAmt = 0;
+      if (taxOn) {
+        taxableValue = total / (1 + taxRate / 100);
+        taxAmt = total - taxableValue;
+        cgstAmt = taxAmt / 2;
+        sgstAmt = taxAmt / 2;
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(28, 37, 33);
+      const itemLines = doc.splitTextToSize(row.purpose || '—', (taxColsOn ? contentW * 0.32 : contentW * 0.42));
+      doc.text(itemLines, c_item, y + 14);
+      doc.text(fmtMoney(taxableValue), c_rate, y + 14);
+      doc.text('1', c_qty, y + 14);
+      if (taxColsOn) {
+        doc.setFontSize(8.5);
+        doc.text(fmtMoney(taxableValue), c_taxable, y + 14);
+        doc.text(fmtMoney(taxAmt), c_taxamt, y + 14);
+        doc.setFontSize(7);
+        doc.setTextColor(120, 124, 116);
+        doc.text(`(${taxRate}%)`, c_taxamt, y + 24);
+        doc.setFontSize(9.5);
+        doc.setTextColor(28, 37, 33);
+      }
+      doc.text(fmtMoney(total), c_amount, y + 14, { align: 'right' });
+      const itemRowH = Math.max(34, itemLines.length * 12 + 20);
+      y += itemRowH;
+
+      doc.setDrawColor(216, 211, 198);
+      doc.setLineWidth(0.5);
+      doc.line(marginX, y, pageW - marginX, y);
+      y += 18;
+
+      // ---- Totals (right aligned) ----
+      const totalsLabelX = pageW - marginX - 190;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(28, 37, 33);
+      doc.text('Taxable Amount', totalsLabelX, y);
+      doc.text('Rs. ' + fmtMoney(taxableValue), pageW - marginX, y, { align: 'right' });
+      y += 15;
+
+      if (taxOn) {
+        doc.text(`CGST ${halfRate}%`, totalsLabelX, y);
+        doc.text('Rs. ' + fmtMoney(cgstAmt), pageW - marginX, y, { align: 'right' });
+        y += 15;
+        doc.text(`SGST ${halfRate}%`, totalsLabelX, y);
+        doc.text('Rs. ' + fmtMoney(sgstAmt), pageW - marginX, y, { align: 'right' });
+        y += 15;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(28, 37, 33);
+      doc.text('Total', totalsLabelX, y + 4);
+      doc.text('Rs. ' + fmtMoney(total), pageW - marginX, y + 4, { align: 'right' });
+      y += 26;
+
+      // ---- Items count + amount in words ----
+      doc.setDrawColor(216, 211, 198);
+      doc.setLineWidth(0.5);
+      doc.line(marginX, y, pageW - marginX, y);
+      y += 14;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(90, 95, 87);
+      doc.text('Total Items / Qty : 1 / 1', marginX, y);
+      const wordsLabel = 'Total amount (in words): INR ' + numberToWordsIndian(total) + '.';
+      const wordsLines = doc.splitTextToSize(wordsLabel, contentW * 0.62);
+      doc.text(wordsLines, pageW - marginX, y, { align: 'right' });
+      y += Math.max(14, wordsLines.length * 11 + 4);
+
+      // ---- HSN/SAC table (only when tax is on) ----
+      if (taxOn) {
+        y += 6;
+        const hCols = {
+          hsn: marginX,
+          taxable: marginX + contentW * 0.30,
+          cRate: marginX + contentW * 0.46,
+          cAmt: marginX + contentW * 0.56,
+          sRate: marginX + contentW * 0.70,
+          sAmt: marginX + contentW * 0.80,
+          totTax: marginX + contentW * 0.90
+        };
+        doc.setDrawColor(168, 161, 147);
+        doc.setLineWidth(0.6);
+        doc.rect(marginX, y, contentW, 40);
+        doc.line(hCols.taxable, y, hCols.taxable, y + 40);
+        doc.line(hCols.cRate, y, hCols.cRate, y + 40);
+        doc.line(hCols.sRate, y, hCols.sRate, y + 20);
+        doc.line(hCols.totTax, y, hCols.totTax, y + 40);
+        doc.line(marginX, y + 20, pageW - marginX, y + 20);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.8);
+        doc.setTextColor(47, 93, 79);
+        doc.text('HSN/SAC', hCols.hsn + 4, y + 13);
+        doc.text('TAXABLE VALUE', hCols.taxable + 4, y + 13);
+        doc.text('CENTRAL TAX', hCols.cRate + 4, y + 13);
+        doc.text('STATE/UT TAX', (hCols.sRate + hCols.totTax) / 2 - 18, y + 13);
+        doc.text('TOTAL TAX', hCols.totTax + 4, y + 13);
+
+        doc.setFontSize(7.3);
+        doc.text('Rate', hCols.cRate + 4, y + 27);
+        doc.text('Amount', hCols.cAmt + 4, y + 27);
+        doc.text('Rate', hCols.sRate + 4, y + 27);
+        doc.text('Amount', hCols.sAmt + 4, y + 27);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(28, 37, 33);
+        doc.text('-', hCols.hsn + 4, y + 35);
+        doc.text(fmtMoney(taxableValue), hCols.taxable + 4, y + 35);
+        doc.text(halfRate + '%', hCols.cRate + 4, y + 35);
+        doc.text(fmtMoney(cgstAmt), hCols.cAmt + 4, y + 35);
+        doc.text(halfRate + '%', hCols.sRate + 4, y + 35);
+        doc.text(fmtMoney(sgstAmt), hCols.sAmt + 4, y + 35);
+        doc.text(fmtMoney(taxAmt), hCols.totTax + 4, y + 35);
+        y += 40;
+
+        // TOTAL row (22px tall band, separate from the 40px rate/amount band above)
+        const totalRowH = 22;
+        doc.setDrawColor(168, 161, 147);
+        doc.line(marginX, y, pageW - marginX, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(28, 37, 33);
+        doc.text('TOTAL', hCols.taxable - 36, y + 14);
+        doc.text(fmtMoney(taxableValue), hCols.taxable + 4, y + 14);
+        doc.text(fmtMoney(cgstAmt), hCols.cAmt + 4, y + 14);
+        doc.text(fmtMoney(sgstAmt), hCols.sAmt + 4, y + 14);
+        doc.text(fmtMoney(taxAmt), hCols.totTax + 4, y + 14);
+        doc.setDrawColor(168, 161, 147);
+        doc.rect(marginX, y - 40, contentW, 40 + totalRowH);
+        y += totalRowH + 18;
+      }
+
+      // ---- Amount payable ----
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(90, 95, 87);
+      doc.text('Amount Payable:', pageW - marginX - 150, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(28, 37, 33);
+      doc.text('Rs. ' + fmtMoney(total), pageW - marginX, y, { align: 'right' });
+      y += 28;
+
+      // ---- Bank details (left) ----
+      if (hasBankDetails) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(28, 37, 33);
+        doc.text('Bank Details:', marginX, y);
+        y += 14;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const bankRows = [
+          ['Bank:', bankName],
+          ['Account #:', bankAccount],
+          ['IFSC Code:', bankIfsc],
+          ['Branch:', bankBranch]
+        ].filter(r => r[1]);
+        bankRows.forEach(([label, val]) => {
+          doc.setTextColor(90, 95, 87);
+          doc.text(label, marginX, y);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(28, 37, 33);
+          doc.text(val, marginX + 70, y);
+          doc.setFont('helvetica', 'normal');
+          y += 13;
+        });
+      }
+
+      // ---- Footer: seal & signature (bottom of page, fixed position) ----
+      const footerY = pageH - 130;
+      const sigBlockX = pageW - marginX - 170;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(90, 95, 87);
+      const forLines = doc.splitTextToSize('For ' + companyName, 170);
+      doc.text(forLines, sigBlockX, footerY - (forLines.length - 1) * 10);
+
+      if (sealDataUrl) {
+        try {
+          doc.addImage(sealDataUrl, getImageFormat(sealDataUrl), marginX, footerY - 10, 68, 68, undefined, 'FAST');
+        } catch (e) { /* ignore bad image */ }
+      }
+
+      if (sigDataUrl) {
+        try {
+          doc.addImage(sigDataUrl, getImageFormat(sigDataUrl), sigBlockX, footerY + 8, 130, 42, undefined, 'FAST');
+        } catch (e) { /* ignore bad image */ }
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(28, 37, 33);
+      if (signerName) {
+        doc.text(signerName, sigBlockX, footerY + 64);
+      }
+      doc.setFontSize(8.5);
+      doc.setTextColor(90, 95, 87);
+      doc.text('Authorized Signatory', sigBlockX, footerY + 76);
+
+      // ---- Page footer note ----
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(150, 150, 145);
+      doc.text('Page 1 / 1  •  This is a computer generated document.', marginX, pageH - 26);
+      doc.text(`${invoiceNo}  ·  Generated ${todayStr}`, pageW - marginX, pageH - 26, { align: 'right' });
+    });
+
+    const fname = `receipts_${invBase.prefix.replace(/[^A-Za-z0-9]/g,'')}${invBase.num}-${invBase.num + rows.length - 1}.pdf`;
+    doc.save(fname);
+
+    statusMsg.textContent = `Done — ${rows.length} receipt(s) saved as ${fname}`;
+    statusMsg.className = 'status-msg ok';
+  } catch (err) {
+    statusMsg.textContent = 'Something went wrong generating the PDF: ' + err.message;
+    statusMsg.className = 'status-msg err';
+  } finally {
+    generateBtn.disabled = false;
+    generateBtn.textContent = originalLabel;
+  }
+});
+</script>
+</body>
+</html>
