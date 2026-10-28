@@ -203,4 +203,87 @@ class CompanyController extends Controller
             'vendor' => $vendor
         ]);
     }
+
+    /**
+     * Delete an asset.
+     */
+    public function deleteAsset($id): JsonResponse
+    {
+        $asset = CompanyAsset::findOrFail($id);
+
+        // Security check: ensure the company belongs to the authenticated tenant
+        Company::findOrFail($asset->company_id);
+
+        // Delete from public storage disk
+        if (Storage::disk('public')->exists($asset->asset_path)) {
+            Storage::disk('public')->delete($asset->asset_path);
+        }
+
+        $wasDefault = $asset->is_default;
+        $companyId = $asset->company_id;
+        $assetType = $asset->asset_type;
+
+        $asset->delete();
+
+        // Promote next default if the deleted one was default
+        if ($wasDefault) {
+            $nextAsset = CompanyAsset::where('company_id', $companyId)
+                ->where('asset_type', $assetType)
+                ->first();
+            if ($nextAsset) {
+                $nextAsset->update(['is_default' => true]);
+            }
+        }
+
+        return response()->json([
+            'message' => 'Asset deleted successfully.'
+        ]);
+    }
+
+    /**
+     * Update an asset (rename label).
+     */
+    public function updateAsset(Request $request, $id): JsonResponse
+    {
+        $request->validate([
+            'asset_name' => 'required|string|max:255'
+        ]);
+
+        $asset = CompanyAsset::findOrFail($id);
+
+        // Security check: ensure the company belongs to the authenticated tenant
+        Company::findOrFail($asset->company_id);
+
+        $asset->update([
+            'asset_name' => $request->asset_name
+        ]);
+
+        return response()->json([
+            'message' => 'Asset updated successfully.',
+            'asset' => $asset
+        ]);
+    }
+
+    /**
+     * Set asset as default.
+     */
+    public function setDefaultAsset($id): JsonResponse
+    {
+        $asset = CompanyAsset::findOrFail($id);
+
+        // Security check: ensure the company belongs to the authenticated tenant
+        Company::findOrFail($asset->company_id);
+
+        // Remove default flag from all other assets of same type for this company
+        CompanyAsset::where('company_id', $asset->company_id)
+            ->where('asset_type', $asset->asset_type)
+            ->update(['is_default' => false]);
+
+        $asset->update(['is_default' => true]);
+
+        return response()->json([
+            'message' => 'Default asset updated successfully.',
+            'asset' => $asset
+        ]);
+    }
 }

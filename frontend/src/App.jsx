@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
 import Assets from './pages/Assets';
 import InvoiceGenerator from './pages/InvoiceGenerator';
+import ManualInvoiceGenerator from './pages/ManualInvoiceGenerator';
 import History from './pages/History';
 import Users from './pages/Users';
 import Subscriptions from './pages/Subscriptions';
@@ -102,6 +103,7 @@ const App = () => {
             <Route path="companies" element={<Companies user={user} />} />
             <Route path="assets" element={<Assets user={user} />} />
             <Route path="generator" element={<InvoiceGenerator user={user} />} />
+            <Route path="manual-invoice" element={<ManualInvoiceGenerator user={user} />} />
             <Route path="receipt-generator" element={<ReceiptGenerator />} />
             <Route path="history" element={<History user={user} />} />
             <Route path="users" element={<Users />} />

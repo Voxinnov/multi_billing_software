@@ -10,7 +10,8 @@ import {
   Bookmark,
   CreditCard,
   Pencil,
-  Save
+  Save,
+  Trash2
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -24,6 +25,11 @@ const Assets = ({ user }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadError, setUploadError]       = useState('');
   const [uploading, setUploading]           = useState(false);
+
+  // Asset management states
+  const [editingAssetId, setEditingAssetId]   = useState(null);
+  const [editingAssetName, setEditingAssetName] = useState('');
+  const [actionLoadingId, setActionLoadingId]   = useState(null);
 
   // Upload Form
   const [assetType, setAssetType]     = useState('logo');
@@ -119,6 +125,51 @@ const Assets = ({ user }) => {
     }
   };
 
+  // ── Asset management handlers ──────────────────────────────────────────────
+  const handleSetDefaultAsset = async (assetId) => {
+    setActionLoadingId(assetId);
+    try {
+      await api.put(`/company/assets/${assetId}/default`);
+      await fetchAssets(selectedCompanyId);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update default asset.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRenameAsset = async (assetId) => {
+    if (!editingAssetName.trim()) {
+      alert('Asset label cannot be empty.');
+      return;
+    }
+    setActionLoadingId(assetId);
+    try {
+      await api.put(`/company/assets/${assetId}`, { asset_name: editingAssetName });
+      setEditingAssetId(null);
+      await fetchAssets(selectedCompanyId);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to rename asset.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeleteAsset = async (assetId) => {
+    if (!window.confirm('Are you sure you want to delete this styling asset? Invoices referencing this asset will no longer be able to display it.')) {
+      return;
+    }
+    setActionLoadingId(assetId);
+    try {
+      await api.delete(`/company/assets/${assetId}`);
+      await fetchAssets(selectedCompanyId);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete asset.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   // ── Bank save handler ──────────────────────────────────────────────────────
   const handleBankSave = async () => {
     if (!selectedCompany) return;
@@ -188,21 +239,91 @@ const Assets = ({ user }) => {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {items.map(asset => (
-            <div key={asset.id} className="border border-slate-100 dark:border-slate-800/80 rounded-xl p-4 flex flex-col items-center bg-slate-50/50 dark:bg-slate-950/20 relative">
-              {asset.is_default && (
-                <span className="absolute top-2 right-2 flex items-center gap-1 text-[9px] font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/40 border border-brand-100 dark:border-brand-900/50 px-1.5 py-0.5 rounded">
-                  <Bookmark className="h-2.5 w-2.5 fill-current" /> Default
-                </span>
-              )}
-              <div className="h-24 flex items-center justify-center mb-3">
-                <img src={asset.asset_url} alt={asset.asset_name} className="max-h-24 max-w-full object-contain" />
+          {items.map(asset => {
+            const isEditing = editingAssetId === asset.id;
+            const isProcessing = actionLoadingId === asset.id;
+            return (
+              <div key={asset.id} className="border border-slate-100 dark:border-slate-800/80 rounded-xl p-4 flex flex-col items-center bg-slate-50/50 dark:bg-slate-950/20 relative group">
+                {asset.is_default && (
+                  <span className="absolute top-2 right-2 flex items-center gap-1 text-[9px] font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/40 border border-brand-100 dark:border-brand-900/50 px-1.5 py-0.5 rounded">
+                    <Bookmark className="h-2.5 w-2.5 fill-current" /> Default
+                  </span>
+                )}
+                <div className="h-24 flex items-center justify-center mb-3">
+                  <img src={asset.asset_url} alt={asset.asset_name} className="max-h-24 max-w-full object-contain" />
+                </div>
+
+                {isEditing ? (
+                  <div className="flex items-center gap-2 w-full mt-2">
+                    <input
+                      type="text"
+                      value={editingAssetName}
+                      onChange={(e) => setEditingAssetName(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-1 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded text-xs font-semibold focus:outline-none focus:border-brand-500 text-slate-800 dark:text-slate-100"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleRenameAsset(asset.id)}
+                      disabled={isProcessing}
+                      className="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded cursor-pointer shrink-0"
+                      title="Save Label"
+                    >
+                      {isProcessing ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <Check className="h-4.5 w-4.5" />}
+                    </button>
+                    <button
+                      onClick={() => setEditingAssetId(null)}
+                      disabled={isProcessing}
+                      className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer shrink-0"
+                      title="Cancel"
+                    >
+                      <X className="h-4.5 w-4.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 w-full">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono text-center break-all px-2">
+                      {asset.asset_name}
+                    </span>
+
+                    {!isReadOnly && (
+                      <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        {!asset.is_default && (
+                          <button
+                            onClick={() => handleSetDefaultAsset(asset.id)}
+                            disabled={isProcessing}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/40 dark:hover:bg-brand-900/60 text-[10px] font-bold text-brand-600 dark:text-brand-400 border border-brand-100 dark:border-brand-900/40 transition-all cursor-pointer disabled:opacity-50"
+                            title="Set as Default"
+                          >
+                            <Bookmark className="h-3 w-3" />
+                            Default
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setEditingAssetId(asset.id);
+                            setEditingAssetName(asset.asset_name);
+                          }}
+                          disabled={isProcessing}
+                          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50"
+                          title="Rename Asset"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAsset(asset.id)}
+                          disabled={isProcessing}
+                          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-red-500 text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all cursor-pointer disabled:opacity-50"
+                          title="Delete Asset"
+                        >
+                          {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono text-center">
-                {asset.asset_name}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

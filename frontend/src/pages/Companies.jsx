@@ -145,6 +145,37 @@ const Companies = ({ user }) => {
     }
   };
 
+  const handleToggleActive = async (comp) => {
+    if (!window.confirm(`Are you sure you want to ${comp.is_active ? 'deactivate' : 'activate'} ${comp.company_name}?`)) {
+      return;
+    }
+    try {
+      await api.post('/company', {
+        company_code: comp.company_code,
+        company_name: comp.company_name,
+        gstin: comp.gstin || '',
+        phone_number: comp.phone_number || '',
+        email: comp.email || '',
+        address_line1: comp.address_line1 || '',
+        address_line2: comp.address_line2 || '',
+        city: comp.city || '',
+        state: comp.state || '',
+        country: comp.country || 'India',
+        pincode: comp.pincode || '',
+        bank_name: comp.bank_name || '',
+        bank_branch: comp.bank_branch || '',
+        bank_account_no: comp.bank_account_no || '',
+        bank_ifsc: comp.bank_ifsc || '',
+        signer_name: comp.signer_name || '',
+        footer_text: comp.footer_text || '',
+        is_active: !comp.is_active
+      });
+      await fetchCompanies();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update company status.');
+    }
+  };
+
   const isReadOnly = user?.role === 'viewer';
 
   return (
@@ -251,13 +282,24 @@ const Companies = ({ user }) => {
               </div>
 
               {!isReadOnly && (
-                <button
-                  onClick={() => openEditModal(comp)}
-                  className="mt-6 w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-brand-500 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 flex items-center justify-center gap-1.5 hover:bg-brand-50/50 dark:hover:bg-brand-950/10 transition-all cursor-pointer"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                  Edit Profile
-                </button>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => openEditModal(comp)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-brand-500 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 flex items-center justify-center gap-1.5 hover:bg-brand-50/50 dark:hover:bg-brand-950/10 transition-all cursor-pointer"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleToggleActive(comp)}
+                    className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer
+                      ${comp.is_active 
+                        ? 'border-red-200 dark:border-red-950/60 hover:border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20' 
+                        : 'border-emerald-200 dark:border-emerald-950/60 hover:border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20'}`}
+                  >
+                    {comp.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
               )}
             </div>
           ))}

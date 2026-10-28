@@ -50,11 +50,21 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('role:super_admin,vendor_admin,staff,viewer');
     Route::get('/company/all-assets', [InvoiceController::class, 'listAllAssets'])
         ->middleware('role:super_admin,vendor_admin,staff,viewer');
+    Route::delete('/company/assets/{id}', [CompanyController::class, 'deleteAsset'])
+        ->middleware('role:super_admin,vendor_admin');
+    Route::put('/company/assets/{id}', [CompanyController::class, 'updateAsset'])
+        ->middleware('role:super_admin,vendor_admin');
+    Route::put('/company/assets/{id}/default', [CompanyController::class, 'setDefaultAsset'])
+        ->middleware('role:super_admin,vendor_admin');
 
     // Excel and Invoice Processing
     Route::post('/upload-excel', [InvoiceController::class, 'uploadExcel'])
         ->middleware('role:super_admin,vendor_admin,staff');
     Route::post('/generate-invoices', [InvoiceController::class, 'uploadExcel']) // Alias endpoint
+        ->middleware('role:super_admin,vendor_admin,staff');
+
+    // Manual single-invoice generation
+    Route::post('/manual-invoice', [InvoiceController::class, 'generateManual'])
         ->middleware('role:super_admin,vendor_admin,staff');
 
     // History and Polling

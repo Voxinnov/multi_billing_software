@@ -4,7 +4,8 @@ import {
   LayoutDashboard, 
   Building2, 
   FileImage, 
-  FileSpreadsheet, 
+  FileSpreadsheet,
+  FilePen,
   History, 
   Users, 
   CreditCard, 
@@ -38,6 +39,7 @@ const Sidebar = ({ user, isDarkMode, toggleDarkMode }) => {
       { path: '/companies', label: 'Companies', icon: Building2, roles: ['vendor_admin', 'staff', 'viewer'] },
       { path: '/assets', label: 'Assets', icon: FileImage, roles: ['vendor_admin', 'staff', 'viewer'] },
       { path: '/generator', label: 'Invoice Generator', icon: FileSpreadsheet, roles: ['vendor_admin', 'staff'] },
+      { path: '/manual-invoice', label: 'Manual Invoice', icon: FilePen, roles: ['vendor_admin', 'staff'] },
 
       { path: '/history', label: 'Invoices', icon: History, roles: ['vendor_admin', 'staff', 'viewer'] },
       { path: '/users', label: 'Users', icon: Users, roles: ['super_admin'] },
